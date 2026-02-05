@@ -1,4 +1,4 @@
-# Stock Monitor - Architecture & Implementation Plan
+# Stock Monitor - Implementation Guide
 
 ## Overview
 
@@ -29,6 +29,37 @@ A scalable real-time stock monitoring platform supporting multiple stocks with c
 ### Deployment
 - **Platform**: Vercel
 - **CI/CD**: Automatic deployment on git push
+
+---
+
+## Phase 0: Prerequisites & Account Setup
+
+Before starting development, complete all preparation steps:
+
+### Accounts & Services
+
+- [ ] **Register Vercel account**
+  - Go to [vercel.com](https://vercel.com) and sign up
+  - Use "Continue with GitHub" for authorization
+
+- [ ] **Register Stock API account**
+  - Option A: [Alpha Vantage](https://www.alphavantage.co/support/#api-key) - Get free API key
+  - Option B: [Finnhub](https://finnhub.io/) - Register for free tier
+  - Save your API key securely
+
+- [ ] **Generate GitHub Personal Access Token**
+  - Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+  - Generate new token with `repo` scope (for creating issues)
+  - Save the token securely
+
+### Local Environment
+
+- [ ] **Verify Node.js installation**
+  - Run `node --version` (should be v18+)
+  - Run `npm --version`
+
+- [ ] **Install Node.js if needed**
+  - Download from [nodejs.org](https://nodejs.org/) or use nvm
 
 ---
 
@@ -69,298 +100,179 @@ stock-monitor/
 
 ## Implementation Phases
 
-### Phase 1: Project Setup (1-2 hours)
+### Phase 1: Project Setup
 
-#### 1.1 Initialize Next.js Project
-```bash
-npx create-next-app@latest stock-monitor --typescript --tailwind --app
-cd stock-monitor
-npm install recharts lucide-react @vercel/kv
-```
+#### 1.1 Initialize Project
+
+- [ ] Create Next.js project with TypeScript and Tailwind CSS
+  - *Tell Claude Code to: "Initialize a new Next.js 14 project with TypeScript, Tailwind CSS, and App Router"*
+
+- [ ] Install required dependencies (recharts, lucide-react, @vercel/kv)
+  - *Tell Claude Code to: "Install the dependencies: recharts, lucide-react, and @vercel/kv"*
 
 #### 1.2 Configuration Setup
 
-**lib/config.ts**
-```typescript
-export interface StockConfig {
-  symbol: string;
-  name: string;
-  lowerThreshold: number;
-  upperThreshold: number;
-  enabled: boolean;
-}
+- [ ] Create stock configuration file with stock symbols, names, and price thresholds
+  - *Tell Claude Code to: "Create lib/config.ts with stock configuration for AMZN and AAPL including upper/lower thresholds"*
 
-export const STOCKS: StockConfig[] = [
-  {
-    symbol: 'AMZN',
-    name: 'Amazon',
-    lowerThreshold: 230,
-    upperThreshold: 240,
-    enabled: true
-  },
-  {
-    symbol: 'AAPL',
-    name: 'Apple',
-    lowerThreshold: 180,
-    upperThreshold: 200,
-    enabled: false  // Disabled by default
-  }
-  // Easy to add more stocks
-];
-```
+- [ ] Create TypeScript type definitions for stocks, alerts, and price data
+  - *Tell Claude Code to: "Create types/index.ts with TypeScript interfaces for StockConfig, PriceData, and Alert"*
 
 #### 1.3 Environment Variables
 
-**.env.example**
-```
-ALPHA_VANTAGE_KEY=your_api_key_here
-GITHUB_TOKEN=your_github_token
-GITHUB_REPO=username/stock-monitor
-KV_REST_API_URL=auto_generated_by_vercel
-KV_REST_API_TOKEN=auto_generated_by_vercel
-```
+- [ ] Create .env.example file listing all required environment variables
+  - *Tell Claude Code to: "Create .env.example with placeholders for ALPHA_VANTAGE_KEY, GITHUB_TOKEN, GITHUB_REPO, and Vercel KV variables"*
+
+- [ ] Create local .env.local file with actual API keys
+  - *Manually create .env.local and add your API keys (do not commit this file)*
 
 ---
 
-### Phase 2: Core Functionality (3-4 hours)
+### Phase 2: Core Functionality
 
 #### 2.1 Stock API Integration
 
-**lib/stock-api.ts**
-```typescript
-export async function fetchStockPrice(symbol: string): Promise<number> {
-  const apiKey = process.env.ALPHA_VANTAGE_KEY;
-  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`;
-  
-  const response = await fetch(url);
-  const data = await response.json();
-  
-  return parseFloat(data['Global Quote']['05. price']);
-}
+- [ ] Create stock API wrapper to fetch real-time prices
+  - *Tell Claude Code to: "Create lib/stock-api.ts with functions to fetch stock prices from Alpha Vantage API"*
 
-export async function fetchMultipleStocks(symbols: string[]): Promise<Map<string, number>> {
-  const prices = new Map<string, number>();
-  
-  for (const symbol of symbols) {
-    const price = await fetchStockPrice(symbol);
-    prices.set(symbol, price);
-  }
-  
-  return prices;
-}
-```
+- [ ] Add support for fetching multiple stock prices
+  - *Tell Claude Code to: "Add a function to fetch prices for multiple stocks with rate limiting"*
 
 #### 2.2 Dashboard Implementation
 
-**Features:**
-- Real-time price display for all enabled stocks
-- Auto-refresh every 5 seconds (client-side polling)
-- Price history chart (last 24 hours)
-- Visual status indicators (buy/hold/sell zones)
-- Recent alerts list
+- [ ] Create main dashboard page with stock cards grid
+  - *Tell Claude Code to: "Create app/page.tsx as the main dashboard showing stock prices in a responsive grid"*
 
-**app/page.tsx**
-- Fetch current prices on load
-- Set up polling interval
-- Display stock cards in grid layout
-- Show alert banner when thresholds are met
+- [ ] Create StockCard component displaying price, thresholds, and status
+  - *Tell Claude Code to: "Create components/StockCard.tsx showing stock name, current price, and buy/sell zone indicator"*
 
-#### 2.3 Cron Job for Monitoring
+- [ ] Create StockChart component for price history visualization
+  - *Tell Claude Code to: "Create components/StockChart.tsx using Recharts to display 24-hour price history"*
 
-**app/api/check-stocks/route.ts**
-```typescript
-export async function GET() {
-  const enabledStocks = STOCKS.filter(s => s.enabled);
-  
-  for (const stock of enabledStocks) {
-    const price = await fetchStockPrice(stock.symbol);
-    
-    // Check thresholds
-    if (price < stock.lowerThreshold) {
-      await createAlert(stock, price, 'BUY');
-    } else if (price > stock.upperThreshold) {
-      await createAlert(stock, price, 'SELL');
-    }
-    
-    // Save to history
-    await savePriceHistory(stock.symbol, price);
-  }
-  
-  return Response.json({ success: true, timestamp: Date.now() });
-}
-```
+- [ ] Create AlertBanner component for threshold notifications
+  - *Tell Claude Code to: "Create components/AlertBanner.tsx to show alerts when prices cross thresholds"*
 
-#### 2.4 Notification System
+- [ ] Implement client-side polling for real-time updates (5-second interval)
+  - *Tell Claude Code to: "Add auto-refresh polling to the dashboard that updates prices every 5 seconds"*
 
-**lib/notifications.ts**
-```typescript
-export async function createAlert(
-  stock: StockConfig,
-  price: number,
-  type: 'BUY' | 'SELL'
-) {
-  const emoji = type === 'BUY' ? '📉' : '📈';
-  const action = type === 'BUY' ? 'Buy Signal' : 'Sell Signal';
-  
-  await createGitHubIssue({
-    title: `${emoji} ${stock.symbol} ${action}: $${price.toFixed(2)}`,
-    body: `
-**Stock**: ${stock.name} (${stock.symbol})
-**Current Price**: $${price.toFixed(2)}
-**Threshold**: $${type === 'BUY' ? stock.lowerThreshold : stock.upperThreshold}
-**Action**: Consider ${type === 'BUY' ? 'buying' : 'selling'}
-**Time**: ${new Date().toISOString()}
-    `,
-    labels: [type === 'BUY' ? 'buy-signal' : 'sell-signal', stock.symbol.toLowerCase()]
-  });
-}
+#### 2.3 API Routes
 
-async function createGitHubIssue(params: {
-  title: string;
-  body: string;
-  labels: string[];
-}) {
-  const [owner, repo] = process.env.GITHUB_REPO!.split('/');
-  
-  await fetch(`https://api.github.com/repos/${owner}/${repo}/issues`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `token ${process.env.GITHUB_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(params)
-  });
-}
-```
+- [ ] Create price API route to get current stock prices
+  - *Tell Claude Code to: "Create app/api/price/route.ts to return current prices for requested stocks"*
+
+- [ ] Create history API route to get price history data
+  - *Tell Claude Code to: "Create app/api/history/route.ts to return price history for charts"*
+
+#### 2.4 Cron Job for Monitoring
+
+- [ ] Create check-stocks API route for scheduled price monitoring
+  - *Tell Claude Code to: "Create app/api/check-stocks/route.ts that checks all enabled stocks and triggers alerts when thresholds are crossed"*
+
+#### 2.5 Notification System
+
+- [ ] Create notification handler for GitHub Issues
+  - *Tell Claude Code to: "Create lib/notifications.ts with a function to create GitHub Issues when price alerts are triggered"*
+
+- [ ] Format alert messages with stock info, price, and recommended action
+  - *Tell Claude Code to: "Add formatted issue body with stock name, current price, threshold, and timestamp"*
 
 ---
 
-### Phase 3: Data Storage (1 hour)
+### Phase 3: Data Storage
 
-#### Option A: Vercel KV (Recommended)
+#### 3.1 Vercel KV Integration
 
-**lib/storage.ts**
-```typescript
-import { kv } from '@vercel/kv';
+- [ ] Create storage layer for price history using Vercel KV
+  - *Tell Claude Code to: "Create lib/storage.ts with functions to save and retrieve price history using Vercel KV"*
 
-export async function savePriceHistory(symbol: string, price: number) {
-  const key = `price:${symbol}`;
-  const timestamp = Date.now();
-  
-  // Store with timestamp as score
-  await kv.zadd(key, {
-    score: timestamp,
-    member: JSON.stringify({ price, timestamp })
-  });
-  
-  // Keep only last 1000 data points
-  await kv.zremrangebyrank(key, 0, -1001);
-}
+- [ ] Implement data retention (keep last 1000 data points per stock)
+  - *Tell Claude Code to: "Add automatic cleanup to remove old data points beyond 1000 entries"*
 
-export async function getPriceHistory(
-  symbol: string,
-  hours: number = 24
-): Promise<Array<{ price: number; timestamp: number }>> {
-  const key = `price:${symbol}`;
-  const since = Date.now() - hours * 60 * 60 * 1000;
-  
-  const data = await kv.zrangebyscore(key, since, '+inf');
-  
-  return data.map(item => JSON.parse(item as string));
-}
-
-export async function getLatestPrice(symbol: string): Promise<number | null> {
-  const history = await getPriceHistory(symbol, 1);
-  return history.length > 0 ? history[history.length - 1].price : null;
-}
-```
-
-**Advantages:**
-- Fast read/write
-- Built-in TTL support
-- Free tier sufficient (256MB)
-- No additional setup required
-
-#### Option B: GitHub JSON Files
-
-Store price history as JSON files in the repo. Suitable for smaller data volumes.
+- [ ] Create function to get latest cached price
+  - *Tell Claude Code to: "Add getLatestPrice function to retrieve the most recent price from storage"*
 
 ---
 
-### Phase 4: Vercel Deployment (30 minutes)
+### Phase 4: Vercel Deployment
 
 #### 4.1 Cron Configuration
 
-**vercel.json**
-```json
-{
-  "crons": [
-    {
-      "path": "/api/check-stocks",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
-```
+- [ ] Create vercel.json with cron schedule (every 5 minutes)
+  - *Tell Claude Code to: "Create vercel.json with cron configuration to run /api/check-stocks every 5 minutes"*
 
-**Cron runs every 5 minutes** - adjust as needed.
+#### 4.2 Initial Deployment
 
-#### 4.2 Environment Variables Setup
+- [ ] Initialize git repository and create initial commit
+  - *Tell Claude Code to: "Initialize git repo and create initial commit"*
 
-In Vercel Dashboard:
-1. Go to Project Settings → Environment Variables
-2. Add all variables from .env.example
-3. Make sure to add for Production, Preview, and Development
+- [ ] Push to GitHub repository
+  - *Manually: Create GitHub repo and push code*
 
-#### 4.3 Deployment Process
+- [ ] Connect repository to Vercel
+  - *Manually: In Vercel dashboard, import the GitHub repository*
 
-```bash
-# Initialize git (if not already)
-git init
-git add .
-git commit -m "Initial commit"
+- [ ] Configure environment variables in Vercel
+  - *Manually: Add all environment variables in Vercel Project Settings → Environment Variables*
 
-# Create GitHub repo and push
-git remote add origin https://github.com/username/stock-monitor.git
-git branch -M main
-git push -u origin main
-
-# Vercel will auto-detect and deploy
-# Or manually: vercel --prod
-```
+- [ ] Create Vercel KV database and link to project
+  - *Manually: In Vercel dashboard, go to Storage → Create KV Database → Link to project*
 
 ---
 
-### Phase 5: Testing & Optimization (1 hour)
+### Phase 5: Testing & Optimization
 
-#### 5.1 Functional Testing Checklist
+#### 5.1 Functional Testing
 
-- [ ] Dashboard loads and displays all enabled stocks
-- [ ] Prices update in real-time (every 5 seconds)
-- [ ] Cron job runs on schedule (check Vercel logs)
-- [ ] GitHub Issues created when thresholds are met
-- [ ] Price history stored correctly
-- [ ] Charts render properly
-- [ ] Responsive design works on mobile
+- [ ] Test dashboard loads and displays all enabled stocks
+- [ ] Test prices update in real-time (every 5 seconds)
+- [ ] Test cron job runs on schedule (check Vercel logs)
+- [ ] Test GitHub Issues created when thresholds are met
+- [ ] Test price history stored correctly
+- [ ] Test charts render properly
+- [ ] Test responsive design works on mobile
 
-#### 5.2 Performance Optimization
+#### 5.2 Error Handling
 
-**Loading States:**
-- Add skeleton loaders for initial load
-- Show loading spinner during refresh
+- [ ] Add loading states and skeleton loaders
+  - *Tell Claude Code to: "Add loading states and skeleton loaders to the dashboard"*
 
-**Error Handling:**
-- Graceful API failure handling
-- Retry logic with exponential backoff
-- User-friendly error messages
+- [ ] Add error handling for API failures
+  - *Tell Claude Code to: "Add error handling with user-friendly messages for API failures"*
 
-**Caching Strategy:**
-- Cache stock prices for 30 seconds client-side
-- Use SWR or React Query for data fetching
+- [ ] Add retry logic with exponential backoff
+  - *Tell Claude Code to: "Add retry logic with exponential backoff for failed API requests"*
 
-**Rate Limiting:**
-- Respect API rate limits (Alpha Vantage: 5 calls/min, 500 calls/day)
-- Implement request queuing if needed
+#### 5.3 Performance Optimization
+
+- [ ] Implement client-side caching for stock prices
+  - *Tell Claude Code to: "Add 30-second client-side cache for stock prices to reduce API calls"*
+
+- [ ] Add request rate limiting to respect API limits
+  - *Tell Claude Code to: "Add rate limiting to stay within Alpha Vantage limits (5 calls/min)"*
+
+---
+
+### Phase 6: Future Enhancements
+
+#### Short-term
+- [ ] Add more stocks (GOOGL, MSFT, TSLA)
+- [ ] Add email notifications (SendGrid)
+- [ ] Add Telegram bot integration
+- [ ] Add custom threshold editor UI
+- [ ] Add CSV export for price history
+
+#### Medium-term
+- [ ] Add user authentication (Clerk or NextAuth)
+- [ ] Add personal watchlists
+- [ ] Add price prediction / trend analysis
+- [ ] Add PWA support
+
+#### Long-term
+- [ ] Multi-user support
+- [ ] Trading recommendations
+- [ ] Broker API integration
+- [ ] Portfolio tracking
+- [ ] Advanced charting (TradingView integration)
 
 ---
 
@@ -378,49 +290,29 @@ git push -u origin main
 
 ---
 
-## Future Enhancements
+## Time Estimate
 
-### Phase 6: Additional Features
-
-**Short-term (1-2 weeks):**
-- [ ] Add more stocks (AAPL, GOOGL, MSFT, TSLA)
-- [ ] Email notifications (SendGrid)
-- [ ] Telegram bot integration
-- [ ] Custom threshold editor (UI)
-- [ ] Export price history as CSV
-
-**Medium-term (1-2 months):**
-- [ ] User authentication (Clerk or NextAuth)
-- [ ] Personal watchlists
-- [ ] Price prediction / trend analysis
-- [ ] Mobile app (React Native)
-- [ ] PWA support
-
-**Long-term:**
-- [ ] Multi-user support
-- [ ] Trading recommendations
-- [ ] Broker API integration (Robinhood, TD Ameritrade)
-- [ ] Portfolio tracking
-- [ ] Advanced charting (TradingView integration)
+| Phase | Tasks | Duration |
+|-------|-------|----------|
+| Phase 0 | Prerequisites & account setup | 30 minutes |
+| Phase 1 | Project setup, configuration | 1-2 hours |
+| Phase 2 | Core functionality development | 3-4 hours |
+| Phase 3 | Data storage implementation | 1 hour |
+| Phase 4 | Vercel deployment | 30 minutes |
+| Phase 5 | Testing & optimization | 1 hour |
+| **Total** | **Complete MVP** | **7-9 hours** |
 
 ---
 
-## Monitoring & Maintenance
+## Cost Breakdown
 
-### Logs & Debugging
-- Monitor Vercel Function logs
-- Track Cron job execution
-- Set up error alerting (Sentry)
-
-### Cost Monitoring
-- Track Vercel usage (should stay in free tier)
-- Monitor API quota usage
-- Watch KV storage consumption
-
-### Updates
-- Weekly review of alert accuracy
-- Monthly dependency updates
-- Quarterly feature assessment
+| Service | Tier | Cost |
+|---------|------|------|
+| Vercel Hosting | Hobby | $0/month |
+| Vercel KV | Free | $0/month (256MB included) |
+| Alpha Vantage API | Free | $0/month (500 calls/day) |
+| GitHub Issues | Free | $0/month |
+| **Total** | | **$0/month** |
 
 ---
 
@@ -439,108 +331,6 @@ git push -u origin main
 
 ---
 
-## Time Estimate
-
-| Phase | Tasks | Duration |
-|-------|-------|----------|
-| Phase 1 | Project setup, configuration | 1-2 hours |
-| Phase 2 | Core functionality development | 3-4 hours |
-| Phase 3 | Data storage implementation | 1 hour |
-| Phase 4 | Vercel deployment | 30 minutes |
-| Phase 5 | Testing & optimization | 1 hour |
-| **Total** | **Complete MVP** | **6-8 hours** |
-
----
-
-## Cost Breakdown
-
-| Service | Tier | Cost |
-|---------|------|------|
-| Vercel Hosting | Hobby | $0/month |
-| Vercel KV | Free | $0/month (256MB included) |
-| Alpha Vantage API | Free | $0/month (500 calls/day) |
-| GitHub Issues | Free | $0/month |
-| **Total** | | **$0/month** 🎉 |
-
----
-
-## Security Considerations
-
-### Environment Variables
-- Never commit .env.local to git
-- Use Vercel environment variables for secrets
-- Rotate GitHub token periodically
-
-### API Keys
-- Restrict API key permissions
-- Monitor for unusual usage
-- Set up usage alerts
-
-### Rate Limiting
-- Implement client-side rate limiting
-- Add server-side request throttling
-- Handle API quota exhaustion gracefully
-
----
-
-## Development Workflow
-
-### Local Development
-```bash
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your keys
-
-# Run development server
-npm run dev
-
-# Test cron endpoint manually
-curl http://localhost:3000/api/check-stocks
-```
-
-### Git Workflow
-```bash
-# Create feature branch
-git checkout -b feature/stock-chart-improvements
-
-# Make changes and commit
-git add .
-git commit -m "Improve chart responsiveness"
-
-# Push and create PR
-git push origin feature/stock-chart-improvements
-```
-
-### Deployment
-- Push to `main` branch → Auto-deploy to production
-- Push to other branches → Auto-deploy to preview
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue**: Cron not running
-- Check Vercel cron logs
-- Verify vercel.json syntax
-- Ensure API route returns 200 status
-
-**Issue**: Stock prices not updating
-- Verify API key is valid
-- Check API rate limit
-- Inspect network requests in browser
-
-**Issue**: GitHub Issues not created
-- Verify GitHub token permissions
-- Check GITHUB_REPO environment variable
-- Test notification endpoint manually
-
----
-
 ## Resources
 
 ### Documentation
@@ -556,12 +346,6 @@ git push origin feature/stock-chart-improvements
 
 ---
 
-## License
-
-MIT License - Feel free to use and modify for your own projects.
-
----
-
-**Last Updated**: 2026-02-04  
-**Status**: 🟡 Planning Phase  
+**Last Updated**: 2026-02-04
+**Status**: Implementation Guide
 **Target Launch**: 3 days from start
