@@ -375,12 +375,21 @@ Create lib/stock-api.ts with function fetchStockPrice(symbol: string):
 - Add console.log for debugging
 ```
 
-**Verify**: Tell Claude Code:
+**Verify**:
+
+First install dotenv:
+```bash
+npm install dotenv
+```
+
+Then tell Claude Code:
 ```
 Create a test file test-stock-api.ts in the root that:
-- Imports fetchStockPrice
-- Calls it with 'AMZN'
-- Logs the result
+- import dotenv from 'dotenv';
+- dotenv.config({ path: '.env.local' });
+- Then import fetchStockPrice
+- Call it with 'AMZN'
+- Log the result
 ```
 
 Run it:
@@ -389,6 +398,8 @@ npx tsx test-stock-api.ts
 ```
 
 You should see Amazon's current stock price logged.
+
+**Note**: You need dotenv to load .env.local when running test scripts directly with tsx.
 
 **If error**: Check your API key in `.env.local`
 
