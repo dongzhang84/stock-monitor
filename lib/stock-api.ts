@@ -1,9 +1,14 @@
-export async function fetchStockPrice(symbol: string): Promise<number | null> {
+export interface StockPriceResult {
+  price: number | null;
+  rateLimited: boolean;
+}
+
+export async function fetchStockPrice(symbol: string): Promise<StockPriceResult> {
   const apiKey = process.env.ALPHA_VANTAGE_KEY;
 
   if (!apiKey) {
     console.log('ALPHA_VANTAGE_KEY not configured');
-    return null;
+    return { price: null, rateLimited: false };
   }
 
   const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`;
@@ -15,18 +20,23 @@ export async function fetchStockPrice(symbol: string): Promise<number | null> {
 
     console.log(`Response for ${symbol}:`, JSON.stringify(data, null, 2));
 
+    if (data['Note'] || data['Information']) {
+      console.log(`Rate limited for ${symbol}`);
+      return { price: null, rateLimited: true };
+    }
+
     const quote = data['Global Quote'];
     if (!quote || !quote['05. price']) {
       console.log(`No price data found for ${symbol}`);
-      return null;
+      return { price: null, rateLimited: false };
     }
 
     const price = parseFloat(quote['05. price']);
     console.log(`Price for ${symbol}: $${price}`);
 
-    return price;
+    return { price, rateLimited: false };
   } catch (error) {
     console.log(`Error fetching price for ${symbol}:`, error);
-    return null;
+    return { price: null, rateLimited: false };
   }
 }

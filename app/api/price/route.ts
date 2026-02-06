@@ -12,9 +12,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const price = await fetchStockPrice(symbol);
+    const result = await fetchStockPrice(symbol);
 
-    if (price === null) {
+    if (result.rateLimited) {
+      return NextResponse.json(
+        { error: 'API rate limit reached. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
+    if (result.price === null) {
       return NextResponse.json(
         { error: `Failed to fetch price for symbol: ${symbol}` },
         { status: 500 }
@@ -23,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       symbol: symbol.toUpperCase(),
-      price,
+      price: result.price,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

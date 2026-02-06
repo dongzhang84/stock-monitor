@@ -521,6 +521,34 @@ Refresh http://localhost:3000
 Refresh again:
 - Price updates (might be same or slightly different)
 
+**Common Issues:**
+
+**Issue 1: API Rate Limit**
+If you see "Loading..." forever and terminal shows:
+`"Information": "Please consider spreading out your free API requests more sparingly (1 request per second)"`
+
+**Solution**: Add useRef to prevent duplicate requests:
+- Use useRef to track if fetch is in progress
+- Check ref before fetching: `if (fetchingRef.current) return;`
+- Set ref to true when starting, false when done
+- This prevents React Strict Mode from causing duplicate API calls
+
+**Issue 2: Undefined price error**
+If you see: `"Cannot read properties of undefined (reading 'toFixed')"`
+
+**Solution**: Add null check in StockCard component:
+- Display price as: `{price ? \`$\{price.toFixed(2)}\` : 'Loading...'}`
+- This handles the loading state properly
+
+**Issue 3: 500 Internal Server Error**
+Happens when Alpha Vantage rate limit is hit (max 1 request/second, 25/day).
+
+**Solution**:
+- Wait 1-2 minutes for API cooldown
+- Restart dev server
+- Refresh browser only once
+- Later we'll add caching with Vercel KV to avoid this
+
 ---
 
 ### Step 5.4: Add Auto-Refresh
