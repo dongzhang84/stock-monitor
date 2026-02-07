@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { STOCKS } from "@/lib/config";
 import { fetchStockPrice } from "@/lib/stock-api";
 import { savePriceHistory } from "@/lib/storage";
+import { createAlert } from "@/lib/notifications";
 
 interface Alert {
   symbol: string;
   price: number;
   type: "BUY" | "SELL";
   timestamp: string;
+  notified: boolean;
+  issueUrl?: string;
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -38,24 +41,36 @@ export async function GET() {
       }
 
       // Check thresholds
+      let alertType: "BUY" | "SELL" | null = null;
       if (price < stock.lowerThreshold) {
-        const alert: Alert = {
-          symbol: stock.symbol,
-          price,
-          type: "BUY",
-          timestamp: new Date().toISOString(),
-        };
-        alerts.push(alert);
+        alertType = "BUY";
         console.log(`[check-stocks] BUY alert: ${stock.symbol} at $${price} (below $${stock.lowerThreshold})`);
       } else if (price > stock.upperThreshold) {
+        alertType = "SELL";
+        console.log(`[check-stocks] SELL alert: ${stock.symbol} at $${price} (above $${stock.upperThreshold})`);
+      }
+
+      if (alertType) {
         const alert: Alert = {
           symbol: stock.symbol,
           price,
-          type: "SELL",
+          type: alertType,
           timestamp: new Date().toISOString(),
+          notified: false,
         };
+
+        try {
+          const result = await createAlert(stock, price, alertType);
+          alert.notified = result.success;
+          alert.issueUrl = result.issueUrl;
+          if (result.success) {
+            console.log(`[check-stocks] Notification sent for ${stock.symbol}: ${result.issueUrl}`);
+          }
+        } catch (notifyError) {
+          console.error(`[check-stocks] Failed to send notification for ${stock.symbol}:`, notifyError);
+        }
+
         alerts.push(alert);
-        console.log(`[check-stocks] SELL alert: ${stock.symbol} at $${price} (above $${stock.upperThreshold})`);
       }
     } catch (error) {
       console.error(`[check-stocks] Error processing ${stock.symbol}:`, error);
