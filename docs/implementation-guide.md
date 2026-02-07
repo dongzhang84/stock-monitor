@@ -408,6 +408,31 @@ You should see Amazon's current stock price logged.
 rm test-stock-api.ts
 ```
 
+#### Dotenv Configuration for Test Scripts
+
+**Why is dotenv needed?** When you run scripts directly with `npx tsx`, Node.js does **not** automatically load `.env.local`. Next.js handles this for you during `npm run dev`, but standalone test scripts need explicit loading.
+
+**Setup**:
+```bash
+npm install dotenv
+```
+
+**Usage in test scripts**:
+```typescript
+// IMPORTANT: dotenv must be imported and configured BEFORE any other imports
+// that depend on environment variables
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
+// Now import modules that use process.env
+import { fetchStockPrice } from './lib/stock-api';
+```
+
+**When is this needed?**
+- Test scripts run with `npx tsx test-file.ts` — **YES, needs dotenv**
+- Next.js app via `npm run dev` — **NO, Next.js loads .env.local automatically**
+- Vercel deployment — **NO, env vars are set in Vercel dashboard**
+
 ---
 
 ### Step 4.2: Create Price API Endpoint
@@ -594,6 +619,43 @@ Update app/page.tsx to:
 - See one card for AMZN (since it's the only enabled stock)
 - All prices update every 5 seconds
 
+#### Common Issue: API Rate Limit with Multiple Stocks
+
+**Problem**: When you add multiple stocks (e.g., AMZN + AAPL), fetching them all at once sends concurrent requests. Alpha Vantage only allows 1 request per second on the free tier, so the second request often fails with a rate limit error.
+
+**Symptoms**:
+- First stock loads fine, second stock shows "Unable to fetch price"
+- Terminal shows: `"Information": "Please consider spreading out your free API requests"`
+
+**Solution**: Fetch stocks sequentially with a delay between requests:
+
+```typescript
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function fetchPrices() {
+  for (let i = 0; i < enabledStocks.length; i++) {
+    const stock = enabledStocks[i];
+    try {
+      const res = await fetch(`/api/price?symbol=${stock.symbol}`);
+      if (!res.ok) throw new Error("API request failed");
+      const data = await res.json();
+      setPrices((prev) => ({ ...prev, [stock.symbol]: data.price }));
+    } catch {
+      setErrors((prev) => ({
+        ...prev,
+        [stock.symbol]: "Unable to fetch price",
+      }));
+    }
+    // Wait 1.5s between requests (except after the last one)
+    if (i < enabledStocks.length - 1) {
+      await delay(1500);
+    }
+  }
+}
+```
+
+**User experience**: Prices appear one by one as each stock loads. This is actually a nice progressive loading effect!
+
 ---
 
 ### Step 5.6: Commit Progress
@@ -713,6 +775,88 @@ git push
 
 ---
 
+## Handling API Rate Limits - Mock Data Mode
+
+### Problem
+
+Alpha Vantage free tier has strict limits:
+- **25 requests per day** (resets at midnight Eastern Time)
+- **1 request per second** maximum
+- During active development, you'll burn through 25 calls very quickly
+- Once exhausted, all API calls return rate limit errors until the next day
+
+### Solution: Mock Data Mode
+
+Create a mock data mode that returns realistic fake prices, allowing unlimited development and testing without touching the real API.
+
+### Step-by-step Setup
+
+**1. Create `lib/mock-data.ts`**:
+
+```typescript
+const basePrices: Record<string, number> = {
+  AMZN: 210,
+  AAPL: 275,
+};
+
+const ranges: Record<string, number> = {
+  AMZN: 5,
+  AAPL: 5,
+};
+
+export function getMockPrice(symbol: string): number {
+  const base = basePrices[symbol] ?? 100;
+  const range = ranges[symbol] ?? 5;
+  const variation = (Math.random() - 0.5) * 2 * range;
+  return parseFloat((base + variation).toFixed(2));
+}
+```
+
+**2. Update `lib/stock-api.ts`** — add mock check at the top of `fetchStockPrice`:
+
+```typescript
+import { getMockPrice } from "./mock-data";
+
+export async function fetchStockPrice(symbol: string): Promise<StockPriceResult> {
+  if (process.env.USE_MOCK_DATA === "true") {
+    const price = getMockPrice(symbol);
+    console.log(`[MOCK] Price for ${symbol}: $${price}`);
+    return { price, rateLimited: false };
+  }
+
+  // ... rest of real API code unchanged
+}
+```
+
+**3. Add to `.env.local`**:
+```
+USE_MOCK_DATA=true
+```
+
+### Switching Between Mock and Real API
+
+| Mode | `.env.local` setting | When to use |
+|------|---------------------|-------------|
+| Mock | `USE_MOCK_DATA=true` | Development, testing UI, testing edge cases |
+| Real | `USE_MOCK_DATA=false` (or remove the line) | Final testing, production |
+
+### Tips
+
+- **API quota resets daily at midnight ET** — if you've exhausted your quota, switch to mock mode and try real API again tomorrow
+- **Test edge cases with mock data** — adjust `basePrices` in `mock-data.ts` to test BUY/SELL/HOLD states (e.g., set AMZN base to 220 to test below-threshold behavior)
+- **Add new stocks to mock data** — when adding a stock to `lib/config.ts`, also add a realistic base price in `mock-data.ts`
+- **Mock mode works everywhere** — locally with `npm run dev`, and even in Vercel if you set the env var there
+
+### Benefits
+
+- Unlimited testing during development
+- Faster page loads (no network delay)
+- Test all UI states (BUY/SELL/HOLD) by adjusting mock prices
+- No risk of exhausting API quota before production
+- Charts will show random price variations over time
+
+---
+
 ## Phase 7: Data Storage with Vercel KV (1 hour)
 
 Store price history for charts.
@@ -720,20 +864,22 @@ Store price history for charts.
 ### Step 7.1: Enable Vercel KV
 **Goal**: Create a KV database
 
+**Note**: Vercel KV is now provided via the **Upstash Marketplace**. The setup flow has changed from the original Vercel-native KV.
+
 **Actions**:
 1. Go to your Vercel project dashboard
-2. Go to Storage tab
-3. Click "Create Database"
-4. Choose "KV" (Redis)
+2. Go to **Storage** tab
+3. Click **"Browse Storage"** or **"Marketplace"**
+4. Find **"Upstash"** → select **"Upstash for Redis"**
 5. Name it: `stock-monitor-kv`
-6. Click "Create"
-7. Click "Connect to Project"
-8. Select your `stock-monitor` project
-9. Click "Connect"
+6. **Region**: Select **Washington D.C. (East)** (recommended — closest to Vercel's default US East deployment)
+7. **Plan**: Free tier (10,000 commands/day, 256MB storage — more than enough)
+8. Click **"Create"**
+9. Connect to your `stock-monitor` project when prompted
 
 **Verify**:
 - In Vercel dashboard, see KV database connected
-- Environment variables automatically added: `KV_REST_API_URL`, `KV_REST_API_TOKEN`
+- Environment variables automatically added: `KV_URL`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`
 
 **Redeploy**:
 ```bash
@@ -877,6 +1023,61 @@ git push
 - See chart on each stock card
 - If no data yet, chart shows "Loading..." or "No data"
 - Wait 5-10 minutes for data to accumulate, then see actual chart
+
+#### Ensure Chart is Added to StockCard
+
+**Common issue**: Claude Code may create `components/StockChart.tsx` but forget to import and render it inside `StockCard.tsx`.
+
+**Verify** the chart is wired up:
+```bash
+grep StockChart components/StockCard.tsx
+```
+
+**Expected output** (two lines):
+```
+import StockChart from "./StockChart";
+        <StockChart
+```
+
+**If missing**, tell Claude Code:
+```
+Update components/StockCard.tsx to:
+- Import StockChart from './StockChart'
+- Add <StockChart symbol={symbol} lowerThreshold={lowerThreshold} upperThreshold={upperThreshold} /> at the bottom of the card
+```
+
+**Expected behavior**: Each stock card should now show a chart area at the bottom. Initially it will display "No historical data yet" — this is normal! Data accumulates as you visit the page.
+
+---
+
+## Data Accumulation Note
+
+Charts need time to collect data points before they can display meaningful graphs.
+
+**How data accumulates**:
+- Each time the dashboard loads, it calls `/api/price` for each stock
+- The price API saves each price to Vercel KV storage
+- The chart fetches the last 24 hours of saved prices
+
+**To build up chart data**:
+1. Visit your dashboard 3-5 times over 5-10 minutes
+2. Wait 1-2 minutes between visits to get distinct data points
+3. Each visit adds one price point per stock
+
+**In mock mode** (`USE_MOCK_DATA=true`):
+- Each visit saves a slightly different random price
+- Charts will show random variations — great for testing the chart UI
+- You'll see the chart populate faster since there are no API rate limits
+
+**With the real API**:
+- Prices only change during US market hours (Mon-Fri, 9:30 AM - 4:00 PM ET)
+- Outside market hours, you'll see a flat line (same price repeated)
+- During market hours, you'll see actual price movements
+
+**After Vercel Cron is set up (Phase 9)**:
+- Prices are saved automatically every 5 minutes
+- Charts will fill up without manual visits
+- After 24 hours of cron running, you'll have ~288 data points per stock
 
 ---
 
@@ -1276,7 +1477,7 @@ After MVP is working, consider:
 
 ---
 
-**Last Updated**: 2026-02-04  
+**Last Updated**: 2026-02-06  
 **Status**: Step-by-Step Implementation Guide  
 **Philosophy**: Small steps, verify each step, ship working software
 
