@@ -1,4 +1,4 @@
-import { TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { TrendingDown, TrendingUp, Minus, RefreshCw } from "lucide-react";
 import StockChart from "./StockChart";
 
 interface StockCardProps {
@@ -7,6 +7,8 @@ interface StockCardProps {
   price: number | null | undefined;
   lowerThreshold: number;
   upperThreshold: number;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 function getStatus(price: number, lower: number, upper: number) {
@@ -30,7 +32,26 @@ const statusConfig = {
   },
 };
 
-export default function StockCard({ symbol, name, price, lowerThreshold, upperThreshold }: StockCardProps) {
+export default function StockCard({ symbol, name, price, lowerThreshold, upperThreshold, error, onRetry }: StockCardProps) {
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-700 bg-gray-800 p-4 shadow-lg">
+        <h2 className="text-lg font-semibold text-white">{name}</h2>
+        <p className="text-sm text-gray-400">{symbol}</p>
+        <p className="mt-2 text-sm text-red-400">{error}</p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-gray-700 px-3 py-1 text-xs text-gray-300 transition hover:bg-gray-600"
+          >
+            <RefreshCw size={12} />
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const status = price != null ? getStatus(price, lowerThreshold, upperThreshold) : null;
   const config = status ? statusConfig[status] : null;
   const Icon = config?.icon;
