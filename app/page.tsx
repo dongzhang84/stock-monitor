@@ -6,6 +6,8 @@ import { STOCKS } from "@/lib/config";
 
 const enabledStocks = STOCKS.filter((s) => s.enabled);
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export default function Home() {
   const [prices, setPrices] = useState<Record<string, number | null>>(() =>
     Object.fromEntries(enabledStocks.map((s) => [s.symbol, null]))
@@ -20,22 +22,27 @@ export default function Home() {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
 
-    enabledStocks.forEach((stock) => {
-      fetch(`/api/price?symbol=${stock.symbol}`)
-        .then((res) => {
+    async function fetchPrices() {
+      for (let i = 0; i < enabledStocks.length; i++) {
+        const stock = enabledStocks[i];
+        try {
+          const res = await fetch(`/api/price?symbol=${stock.symbol}`);
           if (!res.ok) throw new Error("API request failed");
-          return res.json();
-        })
-        .then((data) => {
+          const data = await res.json();
           setPrices((prev) => ({ ...prev, [stock.symbol]: data.price }));
-        })
-        .catch(() => {
+        } catch {
           setErrors((prev) => ({
             ...prev,
             [stock.symbol]: "Unable to fetch price",
           }));
-        });
-    });
+        }
+        if (i < enabledStocks.length - 1) {
+          await delay(1500);
+        }
+      }
+    }
+
+    fetchPrices();
   }, []);
 
   return (
