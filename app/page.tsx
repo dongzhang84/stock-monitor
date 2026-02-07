@@ -67,6 +67,8 @@ export default function Home() {
                 symbol={stock.symbol}
                 name={stock.name}
                 price={prices[stock.symbol]}
+                lowerThreshold={stock.lowerThreshold}
+                upperThreshold={stock.upperThreshold}
               />
             )}
           </div>
