@@ -1,0 +1,20 @@
+# Stock Monitor Cron
+# Runs during US market hours (Mon-Fri, ~10 AM - 4 PM ET) to check
+# stock prices and trigger buy/sell alerts via GitHub Issues.
+# Schedule is in UTC — adjust hours if daylight saving changes.
+
+name: Stock Monitor Cron
+
+on:
+  schedule:
+    # Every 30 minutes, Mon-Fri, 10 AM - 4 PM UTC (approx. market hours ET)
+    - cron: "0,30 14-20 * * 1-5"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-stocks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check stock prices
+        run: |
+          curl -sf "https://stock-monitor.vercel.app/api/check-stocks" || echo "Request failed"
