@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/check-stocks",
-      "schedule": "0,30 10-16 * * 1-5"
+      "schedule": "30 9,12,15 * * 1-5"
     }
   ]
 }
