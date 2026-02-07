@@ -1,6 +1,22 @@
-# Stock Monitor
+# 📈 Stock Monitor
 
-Real-time stock price monitoring dashboard with automated buy/sell alerts via GitHub Issues.
+[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Vercel](https://img.shields.io/badge/Deploy-Vercel-black)](https://vercel.com)
+
+A real-time stock price monitoring system that automatically tracks configured stocks and sends buy/sell alerts via GitHub Issues. Perfect for individual investors who want automated price monitoring without paying for premium tools.
+
+**Key Features:**
+- 🎯 Set custom buy/sell thresholds for any stock
+- 📬 Get automatic alerts as GitHub Issues when prices cross thresholds
+- 📊 View 24-hour price history charts
+- ⚡ Completely free using free tiers (Vercel + GitHub Actions + Alpha Vantage)
+- 🔄 Runs automatically during market hours (Mon-Fri)
+
+**Live Demo**: [stock-monitor.vercel.app](https://stock-monitor.vercel.app)
+
+---
 
 ## Features
 
