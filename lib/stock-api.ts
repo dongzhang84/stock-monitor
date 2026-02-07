@@ -1,9 +1,17 @@
+import { getMockPrice } from "./mock-data";
+
 export interface StockPriceResult {
   price: number | null;
   rateLimited: boolean;
 }
 
 export async function fetchStockPrice(symbol: string): Promise<StockPriceResult> {
+  if (process.env.USE_MOCK_DATA === "true") {
+    const price = getMockPrice(symbol);
+    console.log(`[MOCK] Price for ${symbol}: $${price}`);
+    return { price, rateLimited: false };
+  }
+
   const apiKey = process.env.ALPHA_VANTAGE_KEY;
 
   if (!apiKey) {

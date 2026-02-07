@@ -1,4 +1,5 @@
 import { TrendingDown, TrendingUp, Minus } from "lucide-react";
+import StockChart from "./StockChart";
 
 interface StockCardProps {
   symbol: string;
@@ -71,6 +72,13 @@ export default function StockCard({ symbol, name, price, lowerThreshold, upperTh
           <span className="text-orange-400">Sell Zone: &gt; ${upperThreshold}</span>
         </div>
       )}
+      <div className="mt-4">
+        <StockChart
+          symbol={symbol}
+          lowerThreshold={lowerThreshold}
+          upperThreshold={upperThreshold}
+        />
+      </div>
     </div>
   );
 }
