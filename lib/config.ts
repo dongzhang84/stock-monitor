@@ -14,4 +14,12 @@ export const STOCKS: StockConfig[] = [
     upperThreshold: 240,
     enabled: true,
   },
+
+  {
+  symbol: 'AAPL',
+  name: 'Apple',
+  lowerThreshold: 180,
+  upperThreshold: 200,
+  enabled: true  // 改成 true
+}
 ];
