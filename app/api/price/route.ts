@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchStockPrice } from '@/lib/stock-api';
+import { savePriceHistory } from '@/lib/storage';
 
 export async function GET(request: NextRequest) {
   const symbol = request.nextUrl.searchParams.get('symbol');
@@ -26,6 +27,13 @@ export async function GET(request: NextRequest) {
         { error: `Failed to fetch price for symbol: ${symbol}` },
         { status: 500 }
       );
+    }
+
+    try {
+      await savePriceHistory(symbol.toUpperCase(), result.price);
+      console.log(`Price saved: ${symbol.toUpperCase()} = $${result.price}`);
+    } catch (storageError) {
+      console.error('Failed to save price to storage:', storageError);
     }
 
     return NextResponse.json({
