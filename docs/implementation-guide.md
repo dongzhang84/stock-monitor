@@ -551,21 +551,29 @@ Happens when Alpha Vantage rate limit is hit (max 1 request/second, 25/day).
 
 ---
 
-### Step 5.4: Add Auto-Refresh
-**Goal**: Update price automatically every 5 seconds
+### Step 5.4: Add Auto-Refresh (SKIP THIS STEP)
 
-**Action**: Tell Claude Code:
-```
-Update app/page.tsx to:
-- Set up setInterval in useEffect to fetch price every 5 seconds
-- Clean up interval when component unmounts
-- Read interval from NEXT_PUBLIC_REFRESH_INTERVAL env variable
-```
+**Important: Skip this step for now!**
 
-**Verify**:
-Watch your browser for 10 seconds:
-- Price refreshes automatically
-- Check Network tab: see requests every 5 seconds
+**Why skip:**
+- Alpha Vantage free tier: only 25 API calls per day
+- Auto-refresh every 5 seconds would use 17,280 calls per day
+- This would quickly exhaust the API quota
+
+**Better approach (coming in Phase 9):**
+We'll implement smart monitoring that:
+- Only runs during market hours (Mon-Fri, 9:30 AM - 4:00 PM ET)
+- Checks every 30-60 minutes via Vercel Cron
+- Stores prices in Vercel KV cache
+- Frontend reads from cache (unlimited refreshes)
+- Uses only 7-13 API calls per day
+
+**For now:**
+- Dashboard shows price on page load
+- Manually refresh browser to update
+- Or add a "Refresh" button (optional)
+
+**Proceed directly to Step 5.5**
 
 ---
 
@@ -603,6 +611,31 @@ Visit your Vercel deployment URL:
 - Should auto-deploy
 - See your dashboard live on the internet
 - Prices update every 5 seconds
+
+---
+
+## Stock Market Hours Optimization
+
+**Key insight:** Stock prices only change during trading hours!
+
+**US Stock Market Hours:**
+- Regular: 9:30 AM - 4:00 PM ET (Monday - Friday)
+- Pre-market: 4:00 AM - 9:30 AM ET
+- After-hours: 4:00 PM - 8:00 PM ET
+
+**Smart monitoring strategy (Phase 9):**
+
+| Time Period | Action | API Calls |
+|-------------|--------|-----------|
+| Market hours (9:30 AM - 4:00 PM ET) | Check every 30 min | ~13/day |
+| Pre-market & after-hours | Check every 60 min | ~8/day |
+| Weekends & holidays | No checks | 0 |
+
+**Benefits:**
+- Stays well within Alpha Vantage free tier (25 calls/day)
+- Only fetches when prices can actually change
+- Vercel Cron handles scheduling automatically
+- Frontend reads from KV cache (no API calls)
 
 ---
 
