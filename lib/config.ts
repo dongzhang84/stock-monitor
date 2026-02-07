@@ -10,8 +10,8 @@ export const STOCKS: StockConfig[] = [
   {
     symbol: 'AMZN',
     name: 'Amazon',
-    lowerThreshold: 300,
-    upperThreshold: 400,
+    lowerThreshold: 230,
+    upperThreshold: 240,
     enabled: true,
   },
 

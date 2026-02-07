@@ -1074,78 +1074,140 @@ Charts need time to collect data points before they can display meaningful graph
 - Outside market hours, you'll see a flat line (same price repeated)
 - During market hours, you'll see actual price movements
 
-**After Vercel Cron is set up (Phase 9)**:
-- Prices are saved automatically every 5 minutes
+**After GitHub Actions cron is set up (Phase 9)**:
+- Prices are saved automatically every 30 minutes during market hours
 - Charts will fill up without manual visits
-- After 24 hours of cron running, you'll have ~288 data points per stock
+- After a full trading day, you'll have ~14 data points per stock
 
 ---
 
-## Phase 9: Automated Monitoring with Cron (1 hour)
+## Phase 9: Automated Monitoring with GitHub Actions (30 minutes)
 
-Set up scheduled job to check prices and send alerts.
+Set up automated price checking using GitHub Actions instead of Vercel Cron.
+
+**Why GitHub Actions?**
+- Vercel Hobby plan limits cron jobs to once per day
+- GitHub Actions is free and allows flexible scheduling
+- Can run every 30 minutes during market hours
+- 2000 free minutes per month (more than enough)
+
+---
 
 ### Step 9.1: Create Check-Stocks Endpoint
-**Goal**: Endpoint that checks all stocks and triggers alerts
+
+**Goal**: API endpoint that checks all stocks and triggers alerts
 
 **Action**: Tell Claude Code:
 ```
 Create app/api/check-stocks/route.ts that:
 - Gets all enabled stocks from config
-- For each stock:
-  - Fetch current price
+- For each stock (with 1.5s delay between requests):
+  - Use fetchStockPrice to get current price
   - Check if price < lowerThreshold or > upperThreshold
-  - If threshold crossed, log it (we'll add notifications next)
-  - Save price to history
-- Return JSON summary: {checked: count, alerts: array}
+  - If threshold crossed, call createAlert
+  - Use savePriceHistory to save price
+- Return JSON summary: {checked: number, alerts: Alert[]}
 ```
 
 **Verify**:
 ```bash
-npm run dev
+npm run build
 ```
-Visit http://localhost:3000/api/check-stocks
-- See JSON response showing checked stocks
-- Check console logs
+- No TypeScript errors
 
 ---
 
-### Step 9.2: Configure Vercel Cron
-**Goal**: Run check-stocks automatically every 5 minutes
+### Step 9.2: Delete Vercel Cron Config
+
+**Goal**: Remove Vercel cron (not needed)
 
 **Action**: Tell Claude Code:
 ```
-Create vercel.json with cron configuration:
-- Path: /api/check-stocks
-- Schedule: */5 * * * * (every 5 minutes)
+Delete vercel.json file - we're using GitHub Actions instead
+```
+
+---
+
+### Step 9.3: Create GitHub Actions Workflow
+
+**Goal**: Automate stock checking every 30 minutes during market hours
+
+**Action**: Tell Claude Code:
+```
+Create .github/workflows/stock-monitor.yml:
+
+- Name: Stock Monitor Cron
+- Trigger: schedule with cron: "0,30 10-16 * * 1-5"
+- Job runs-on: ubuntu-latest
+- Single step: curl your Vercel deployment URL/api/check-stocks
+- Add comment: Runs every 30 min during US market hours (Mon-Fri 10 AM-4 PM ET)
 ```
 
 **Verify**:
 ```bash
-cat vercel.json
+cat .github/workflows/stock-monitor.yml
 ```
-- File exists with cron config
+- File exists with correct cron schedule
 
 ---
 
-### Step 9.3: Deploy Cron
-**Goal**: Activate scheduled job
+### Step 9.4: Deploy and Test
+
+**Goal**: Verify automated monitoring works
 
 **Actions**:
 ```bash
 git add .
-git commit -m "Add cron job for automated monitoring"
+git commit -m "Add GitHub Actions automated monitoring"
 git push
 ```
 
-Wait for deployment.
-
 **Verify**:
-1. Go to Vercel dashboard
-2. Your project → Logs tab
-3. Wait up to 5 minutes
-4. See logs from `/api/check-stocks` appearing automatically
-5. Logs show stocks being checked every 5 minutes
+
+1. **Manual API test**:
+   Visit: `https://your-app.vercel.app/api/check-stocks`
+   - Should return: `{checked: X, alerts: [...]}`
+
+2. **Manual workflow trigger**:
+   - GitHub repo → Actions tab
+   - Select "Stock Monitor Cron"
+   - Click "Run workflow" → "Run workflow"
+   - Wait for completion (green checkmark)
+   - Check run logs to see API was called
+
+3. **Wait for automatic run**:
+   - Workflow runs automatically at XX:00 and XX:30 (if during market hours)
+   - Check Actions tab for automatic runs
+   - Check Issues tab for any alerts created
+
+**Troubleshooting**:
+- If workflow fails: Check logs in Actions tab
+- If no alerts: Normal if prices within thresholds
+- If API returns empty: Check Vercel deployment logs
+
+---
+
+### Step 9.5: Monitor Workflow
+
+**Where to check**:
+- **GitHub Actions**: See all workflow runs
+- **Vercel Logs**: See API calls from GitHub Actions
+- **GitHub Issues**: See generated alerts
+
+**Expected behavior**:
+- Runs Monday-Friday during market hours
+- 13 times per day (every 30 minutes from 10 AM-4 PM ET)
+- Creates issues only when thresholds are crossed
+- Each run uses 1 API call per enabled stock
+
+---
+
+**Important Notes**:
+
+- GitHub Actions runs on UTC time, adjust cron if needed
+- Free tier: 2000 minutes/month (our usage: ~13 runs × 30 seconds × 22 days = ~143 minutes/month)
+- Workflow won't run if repository has no recent activity (GitHub limitation)
+- Can manually trigger anytime from Actions tab
 
 ---
 
@@ -1456,7 +1518,7 @@ git push
 | Phase 6: Thresholds | 45 min |
 | Phase 7: KV Storage | 1 hour |
 | Phase 8: Charts | 1 hour |
-| Phase 9: Cron | 1 hour |
+| Phase 9: GitHub Actions Cron | 30 min |
 | Phase 10: Notifications | 1 hour |
 | Phase 11: Polish | 1 hour |
 | **Total** | **~9 hours** |
