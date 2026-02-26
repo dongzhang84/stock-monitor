@@ -41,6 +41,12 @@
 
 ---
 
+## 继续讨论
+- 本项目的规划讨论在此 Claude thread 进行：https://claude.ai/chat/44c5d2db-6179-46f6-9d56-c777fb927995
+- 下次继续时，直接在这个 thread 里说"继续 stock-monitor"即可，Claude 能看到历史上下文
+
+---
+
 ## 参考资料
 - 书目：*Constable & Wright — 投资经济指标*（50+ 指标，本项目精选 10 个）
 - 选指标的原则：高频 + 与股市直接相关
